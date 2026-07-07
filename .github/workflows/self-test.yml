@@ -1,0 +1,70 @@
+name: self-test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Exercises the lint wrapper (JSON → annotations → exit) on all three OSes.
+  #
+  # NOTE: `crustyimg lint` ships in crustyimg 0.4.0; no *published release* has it
+  # yet, so we build the lint-capable binary from `main` into PATH and run the
+  # action with `install: false`. Once 0.4.0 is out, the normal path is
+  # `install: true` + `version: v0.4.0` (or `latest`).
+  lint-wrapper:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build crustyimg (lint) from main
+        shell: bash
+        run: |
+          cargo install --git https://github.com/jysf/crustyimg \
+            --branch main --no-default-features --locked crustyimg
+          crustyimg --version
+
+      - name: Lint the GPS-leak fixture (must annotate + fail)
+        id: lint
+        continue-on-error: true
+        uses: ./
+        with:
+          install: 'false'
+          paths: test-assets
+
+      - name: Assert the lint failed (findings → non-zero)
+        shell: bash
+        run: |
+          if [ "${{ steps.lint.outcome }}" != "failure" ]; then
+            echo "expected the GPS-leak lint to fail, got '${{ steps.lint.outcome }}'"
+            exit 1
+          fi
+          echo "GPS-leak lint failed as expected ✅"
+
+      - name: fail-level=never reports but stays green
+        uses: ./
+        with:
+          install: 'false'
+          paths: test-assets
+          fail-level: never
+
+  # Exercises the setup-crustyimg delegation + optimize mode against a real,
+  # published release (v0.3.1) — no source build needed.
+  optimize-delegation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Optimize via the action (installs v0.3.1 through setup-crustyimg)
+        uses: ./
+        with:
+          mode: optimize
+          version: v0.3.1
+          paths: test-assets/clean.png
+          args: -o out.png
+      - name: Optimized file exists
+        shell: bash
+        run: test -f out.png && echo "optimize produced $(wc -c < out.png) bytes"

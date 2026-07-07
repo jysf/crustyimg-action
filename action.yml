@@ -1,0 +1,130 @@
+name: crustyimg
+description: >-
+  Lint (or optimize) an image asset tree with crustyimg and annotate findings
+  inline in the PR — a format-aware, no-URL CI check with a runnable fix each.
+author: jysf
+branding:
+  icon: image
+  color: orange
+
+inputs:
+  mode:
+    description: 'What to run: "lint" (annotate findings) or "optimize" (re-encode a tree).'
+    required: false
+    default: lint
+  paths:
+    description: 'Files, directories, or globs to check (space-separated).'
+    required: false
+    default: '.'
+  args:
+    description: 'Extra arguments passed through to crustyimg (e.g. --select, --config, -o).'
+    required: false
+    default: ''
+  version:
+    description: 'crustyimg release to install (passed to setup-crustyimg): a tag or "latest".'
+    required: false
+    default: latest
+  fail-level:
+    description: 'When to fail the job: "error" (default), "warn" (also fail on warnings), or "never".'
+    required: false
+    default: error
+  install:
+    description: 'Install crustyimg via setup-crustyimg. Set "false" if crustyimg is already on PATH.'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # Delegate installation to setup-crustyimg (skippable if crustyimg is already
+    # on PATH, e.g. a prior setup step or a cached build). Pinned to @main until
+    # the maintainer tags v1 (see README).
+    - name: Install crustyimg
+      if: ${{ inputs.install == 'true' }}
+      uses: jysf/setup-crustyimg@main
+      with:
+        version: ${{ inputs.version }}
+
+    - name: Run crustyimg (${{ inputs.mode }})
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        PATHS: ${{ inputs.paths }}
+        EXTRA_ARGS: ${{ inputs.args }}
+        FAIL_LEVEL: ${{ inputs.fail-level }}
+      run: |
+        set -uo pipefail
+
+        # Optimize mode: run the optimizer over the tree (commit-back is a v2; see README).
+        if [ "$MODE" = "optimize" ]; then
+          # shellcheck disable=SC2086
+          crustyimg optimize $PATHS $EXTRA_ARGS
+          exit $?
+        fi
+
+        if [ "$MODE" != "lint" ]; then
+          echo "::error::unknown mode '$MODE' (expected 'lint' or 'optimize')"
+          exit 2
+        fi
+
+        # `warn` fail-level → warnings also fail the gate.
+        gate=""
+        [ "$FAIL_LEVEL" = "warn" ] && gate="--max-warnings 0"
+
+        report="${RUNNER_TEMP:-/tmp}/crustyimg-lint.json"
+        errlog="${RUNNER_TEMP:-/tmp}/crustyimg-lint.err"
+
+        # shellcheck disable=SC2086
+        crustyimg lint $PATHS $EXTRA_ARGS $gate --format json > "$report" 2> "$errlog"
+        code=$?
+
+        # Exit 2/3 are usage / no-inputs — a misconfiguration, not findings.
+        if [ "$code" = 2 ] || [ "$code" = 3 ]; then
+          echo "::error::crustyimg lint could not run (exit $code)"
+          cat "$errlog" >&2 || true
+          exit "$code"
+        fi
+
+        # Emit native annotations + a job-summary table from the JSON report.
+        if command -v jq >/dev/null 2>&1 && jq -e . "$report" >/dev/null 2>&1; then
+          jq -r '.findings[] | [.severity, .file, .rule, .message, (.fix // "")] | @tsv' "$report" \
+          | while IFS="$(printf '\t')" read -r sev file rule msg fix; do
+              case "$sev" in
+                error) lvl=error ;;
+                warn)  lvl=warning ;;
+                *)     lvl=notice ;;
+              esac
+              msg_out="$msg"
+              [ -n "$fix" ] && msg_out="$msg_out — fix: $fix"
+              echo "::${lvl} file=${file},title=crustyimg ${rule}::${msg_out}"
+            done || true
+
+          {
+            scanned=$(jq -r '.summary.files_scanned' "$report")
+            errs=$(jq -r '.summary.errors' "$report")
+            warns=$(jq -r '.summary.warnings' "$report")
+            infos=$(jq -r '.summary.infos' "$report")
+            total=$(jq -r '.findings | length' "$report")
+            echo "## crustyimg lint"
+            echo ""
+            echo "**${scanned}** scanned — **${errs}** error · **${warns}** warn · **${infos}** info"
+            echo ""
+            if [ "$total" -gt 0 ]; then
+              echo "| Severity | Rule | File | Message |"
+              echo "|---|---|---|---|"
+              jq -r '.findings[] | "| \(.severity) | `\(.rule)` | \(.file) | \(.message) |"' "$report"
+            else
+              echo "No findings. ✅"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
+        else
+          # No parseable report (e.g. jq missing): surface raw output, don't hide it.
+          cat "$report" || true
+        fi
+
+        # fail-level=never → report only, never fail the job. Otherwise propagate
+        # crustyimg's exit (0 clean, 7 = the gate tripped).
+        if [ "$FAIL_LEVEL" = "never" ]; then
+          exit 0
+        fi
+        exit "$code"
