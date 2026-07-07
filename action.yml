@@ -55,8 +55,10 @@ runs:
         # is misparsed as subtraction and yields an empty string.
         FAIL_LEVEL: ${{ inputs['fail-level'] }}
       run: |
-        set -uo pipefail
-        echo "::notice::DEBUG mode=[${MODE:-UNSET}] fail_level=[${FAIL_LEVEL:-UNSET}]"
+        # The composite default shell is `bash -e -o pipefail`, so `crustyimg`'s
+        # non-zero exit (7 on findings) would abort the script before we can
+        # annotate + apply fail-level. Disable errexit and handle exits ourselves.
+        set +e -o pipefail
 
         # Optimize mode: run the optimizer over the tree (commit-back is a v2; see README).
         if [ "$MODE" = "optimize" ]; then
