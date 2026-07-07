@@ -56,6 +56,7 @@ runs:
         FAIL_LEVEL: ${{ inputs['fail-level'] }}
       run: |
         set -uo pipefail
+        echo "::notice::DEBUG mode=[${MODE:-UNSET}] fail_level=[${FAIL_LEVEL:-UNSET}]"
 
         # Optimize mode: run the optimizer over the tree (commit-back is a v2; see README).
         if [ "$MODE" = "optimize" ]; then
