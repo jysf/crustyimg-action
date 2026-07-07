@@ -6,12 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Exercises the lint wrapper (JSON → annotations → exit) on all three OSes.
-  #
-  # NOTE: `crustyimg lint` ships in crustyimg 0.4.0; no *published release* has it
-  # yet, so we build the lint-capable binary from `main` into PATH and run the
-  # action with `install: false`. Once 0.4.0 is out, the normal path is
-  # `install: true` + `version: v0.4.0` (or `latest`).
+  # Exercises the full lint wrapper (install → JSON → annotations → exit) on all
+  # three OSes against the released crustyimg (v0.4.0, the first release that
+  # ships `lint`).
   lint-wrapper:
     strategy:
       fail-fast: false
@@ -21,19 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build crustyimg (lint) from main
-        shell: bash
-        run: |
-          cargo install --git https://github.com/jysf/crustyimg \
-            --branch main --no-default-features --locked crustyimg
-          crustyimg --version
-
       - name: Lint the GPS-leak fixture (must annotate + fail)
         id: lint
         continue-on-error: true
         uses: ./
         with:
-          install: 'false'
+          version: v0.4.0
           paths: test-assets
 
       - name: Assert the lint failed (findings → non-zero)
@@ -48,21 +38,20 @@ jobs:
       - name: fail-level=never reports but stays green
         uses: ./
         with:
-          install: 'false'
+          version: v0.4.0
           paths: test-assets
           fail-level: never
 
-  # Exercises the setup-crustyimg delegation + optimize mode against a real,
-  # published release (v0.3.1) — no source build needed.
-  optimize-delegation:
+  # Exercises the optimize mode (also proves the setup-crustyimg delegation).
+  optimize-mode:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Optimize via the action (installs v0.3.1 through setup-crustyimg)
+      - name: Optimize via the action
         uses: ./
         with:
           mode: optimize
-          version: v0.3.1
+          version: v0.4.0
           paths: test-assets/clean.png
           args: -o out.png
       - name: Optimized file exists

@@ -37,11 +37,10 @@ runs:
   using: composite
   steps:
     # Delegate installation to setup-crustyimg (skippable if crustyimg is already
-    # on PATH, e.g. a prior setup step or a cached build). Pinned to @main until
-    # the maintainer tags v1 (see README).
+    # on PATH, e.g. a prior setup step or a cached build).
     - name: Install crustyimg
       if: ${{ inputs.install == 'true' }}
-      uses: jysf/setup-crustyimg@main
+      uses: jysf/setup-crustyimg@v1
       with:
         version: ${{ inputs.version }}
 

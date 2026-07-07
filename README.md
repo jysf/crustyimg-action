@@ -64,12 +64,10 @@ tree passes. Configure rules with a `.crustyimg-lint.toml` in your repo, or via 
 
 ## Maintainer / release notes
 
-- `crustyimg lint` ships in **crustyimg 0.4.0**; until that release is published, the self-test builds
-  the lint binary from `main`. Consumers on 0.4.0+ get it via `setup-crustyimg` normally.
-- This action references `jysf/setup-crustyimg@main`. After the maintainer tags `setup-crustyimg` at
-  `v1`, bump that reference to `@v1`, then **tag this repo `v1`** so consumers can use
-  `uses: jysf/crustyimg-action@v1`. Marketplace listing (optional) is via *Releases → Publish this
-  Action*. These outward steps are the maintainer's, like the crustyimg release tag.
+- `crustyimg lint` ships in **crustyimg 0.4.0+** (published to crates.io / Homebrew / GitHub
+  Releases). This action installs it via [`jysf/setup-crustyimg@v1`](https://github.com/jysf/setup-crustyimg).
+- Tagged **`v1`** (moving major) + `v1.0.0`. A GitHub Marketplace listing (optional) is via
+  *Releases → Publish this Action* — the maintainer's step.
 
 ## License
 
