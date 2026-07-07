@@ -51,7 +51,9 @@ runs:
         MODE: ${{ inputs.mode }}
         PATHS: ${{ inputs.paths }}
         EXTRA_ARGS: ${{ inputs.args }}
-        FAIL_LEVEL: ${{ inputs.fail-level }}
+        # NOTE: hyphenated input names must use bracket access — `inputs.fail-level`
+        # is misparsed as subtraction and yields an empty string.
+        FAIL_LEVEL: ${{ inputs['fail-level'] }}
       run: |
         set -uo pipefail
 
