@@ -62,12 +62,15 @@ tree passes. Configure rules with a `.crustyimg-lint.toml` in your repo, or via 
   is deferred to a v2. It needs write permissions and careful fork-safety handling (a PR from a fork
   can't be granted write to the base repo), so it is intentionally out of scope for v1.
 
-## Maintainer / release notes
+## Requirements & versioning
 
-- `crustyimg lint` ships in **crustyimg 0.4.0+** (published to crates.io / Homebrew / GitHub
-  Releases). This action installs it via [`jysf/setup-crustyimg@v1`](https://github.com/jysf/setup-crustyimg).
-- Tagged **`v1`** (moving major) + `v1.0.0`. A GitHub Marketplace listing (optional) is via
-  *Releases → Publish this Action* — the maintainer's step.
+- `crustyimg lint` ships in **crustyimg 0.4.0+**. The `version` input defaults to `latest`;
+  the action installs the CLI via
+  [`jysf/setup-crustyimg`](https://github.com/jysf/setup-crustyimg), which verifies the release
+  checksum.
+- `v1` is a moving major tag — it always points at the newest `v1.x` release, so
+  `uses: jysf/crustyimg-action@v1` picks up fixes without a workflow edit. Pin an exact release
+  (`@v1.0.1`) if you'd rather control upgrades yourself.
 
 ## License
 
