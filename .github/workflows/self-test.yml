@@ -7,23 +7,25 @@ on:
 
 jobs:
   # Exercises the full lint wrapper (install → JSON → annotations → exit) on all
-  # three OSes against the released crustyimg (v0.4.0, the first release that
-  # ships `lint`).
+  # three OSes, against both a pinned crustyimg release and `latest`.
   lint-wrapper:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        version: [v0.8.0, latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
+      # A directory input lints only the files directly inside it, so the copy
+      # in test-assets/nested/ is not part of this run.
       - name: Lint the GPS-leak fixture (must annotate + fail)
         id: lint
         continue-on-error: true
         uses: ./
         with:
-          version: v0.4.0
+          version: ${{ matrix.version }}
           paths: test-assets
 
       - name: Assert the lint failed (findings → non-zero)
@@ -35,12 +37,32 @@ jobs:
           fi
           echo "GPS-leak lint failed as expected ✅"
 
-      - name: fail-level=never reports but stays green
+      # The wrapper leaves its (path-rewritten) report in RUNNER_TEMP. Annotations
+      # only attach to PR files when paths are workspace-relative with `/`.
+      - name: Assert annotation paths are workspace-relative
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/crustyimg-lint.json"
+          jq -r '.findings[].file' "$report"
+          jq -e '[.findings[].file] == ["test-assets/gps-leak.jpg"]' "$report" >/dev/null
+          echo "paths are relative ✅"
+
+      - name: A recursive glob reaches nested files; fail-level=never stays green
         uses: ./
         with:
-          version: v0.4.0
-          paths: test-assets
+          version: ${{ matrix.version }}
+          paths: test-assets/**/*
           fail-level: never
+
+      - name: Assert the glob found the nested file
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/crustyimg-lint.json"
+          jq -r '.findings[].file' "$report"
+          jq -e '[.findings[].file] | sort == ["test-assets/gps-leak.jpg", "test-assets/nested/gps-leak.jpg"]' "$report" >/dev/null
+          echo "glob reached test-assets/nested ✅"
 
   # Exercises the optimize mode (also proves the setup-crustyimg delegation).
   optimize-mode:
@@ -51,7 +73,7 @@ jobs:
         uses: ./
         with:
           mode: optimize
-          version: v0.4.0
+          version: v0.8.0
           paths: test-assets/clean.png
           args: -o out.png
       - name: Optimized file exists
