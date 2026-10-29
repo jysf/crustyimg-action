@@ -58,6 +58,10 @@ runs:
         # non-zero exit (7 on findings) would abort the script before we can
         # annotate + apply fail-level. Disable errexit and handle exits ourselves.
         set +e -o pipefail
+        # Pass globs like 'assets/**/*' through to crustyimg literally. Without
+        # this, bash expands them first (and treats `**` as `*`), so a recursive
+        # glob silently loses depth. Space-separated paths still split as before.
+        set -f
 
         # Optimize mode: run the optimizer over the tree (commit-back is a v2; see README).
         if [ "$MODE" = "optimize" ]; then
@@ -89,8 +93,29 @@ runs:
           exit "$code"
         fi
 
+        # crustyimg reports files found by walking a directory as absolute paths.
+        # GitHub only anchors an annotation to a PR file when the path is
+        # relative to the workspace, so strip the workspace prefix in every form
+        # it can take (symlink-resolved, and on Windows the `\\?\` and `D:/` forms).
+        # Backslashes become `/` so Windows paths match the PR's files.
+        prefixes="$(pwd -P)/
+        $PWD/"
+        if command -v cygpath >/dev/null 2>&1; then
+          win="$(cygpath -w "$PWD")"
+          prefixes="\\\\?\\${win}\\
+        ${win}\\
+        $(cygpath -m "$PWD")/
+        $prefixes"
+        fi
+        prefixes_json="$(printf '%s\n' "$prefixes" | sed 's/^ *//' | jq -R . | jq -s 'map(select(length > 0))')"
+
         # Emit native annotations + a job-summary table from the JSON report.
         if command -v jq >/dev/null 2>&1 && jq -e . "$report" >/dev/null 2>&1; then
+          jq --argjson pre "$prefixes_json" \
+            'def strip: reduce $pre[] as $p (.; split($p) | join(""));
+             .findings |= map(.file |= (strip | gsub("\\\\"; "/")) | .fix |= (if . then (strip | gsub("\\\\"; "/")) else . end))' \
+            "$report" > "$report.rel" && mv "$report.rel" "$report"
+
           jq -r '.findings[] | [.severity, .file, .rule, .message, (.fix // "")] | @tsv' "$report" \
           | while IFS="$(printf '\t')" read -r sev file rule msg fix; do
               case "$sev" in
