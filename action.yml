@@ -1,7 +1,7 @@
 name: crustyimg
 description: >-
-  Lint (or optimize) an image asset tree with crustyimg and annotate findings
-  inline in the PR — a format-aware, no-URL CI check with a runnable fix each.
+  Lint an image asset tree with crustyimg and annotate each finding inline on
+  the pull request, with a runnable fix.
 author: jysf
 branding:
   icon: image

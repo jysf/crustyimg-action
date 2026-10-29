@@ -75,7 +75,7 @@ don't need to quote them.
   checksum.
 - `v1` is a moving major tag — it always points at the newest `v1.x` release, so
   `uses: jysf/crustyimg-action@v1` picks up fixes without a workflow edit. Pin an exact release
-  (`@v1.0.2`) if you'd rather control upgrades yourself.
+  (`@v1.0.3`) if you'd rather control upgrades yourself.
 
 ## License
 
