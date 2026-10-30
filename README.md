@@ -9,6 +9,10 @@ It installs crustyimg via [`setup-crustyimg`](https://github.com/jysf/setup-crus
 `crustyimg lint … --format json` and emits native `::error`/`::warning`/`::notice` annotations plus
 a job-summary table.
 
+**New to this?** The [setup guide](https://github.com/jysf/crustyimg/blob/main/docs/github-actions.md) walks through budgets, required checks,
+pull requests from forks and fixing findings, and [`jysf/crustyimg-example`](https://github.com/jysf/crustyimg-example) is a live repo
+using it ([pull request #1](https://github.com/jysf/crustyimg-example/pull/1) shows the annotations).
+
 ## Usage
 
 ```yaml
